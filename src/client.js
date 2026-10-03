@@ -27,12 +27,27 @@ window.__ModuleLoader__.load({
     const h = React.createElement;
 
     // ───────────────────────────── 样式 ─────────────────────────────
+    /** 表单作用域：原生 placeholder / select 下拉项只能用样式表覆盖，故带一个类名。 */
+    const SCOPE = 'ai-super-search-scope';
+
     const C = {
       primary: 'var(--dsw-alias-label-primary, #0f172a)',
       secondary: 'var(--dsw-alias-label-secondary, #475569)',
       tertiary: 'var(--dsw-alias-label-tertiary, #94a3b8)',
       border: 'var(--dsw-alias-border-l2, #cbd5e1)',
-      field: 'var(--dsw-alias-field-fill, #ffffff)',
+      // ⚠ 别用 `--dsw-alias-field-fill`：DSH 主题里**没有**定义这个 token。
+      // 深色模式下它会回落成 `#ffffff` 白底，而输入文字用的
+      // `--dsw-alias-label-primary` 在深色下是近白
+      // （--dsw-static-neutral-bluish-50 = #f9fafb）→ 白底白字，
+      // 用户看不见自己敲了什么（placeholder 是 UA 默认灰反而看得见）。
+      // 改用两套主题都真实存在的 `--dsw-alias-bg-layer-1`
+      // （浅色 bluish-00 / 深色 bluish-875），兜底写 `transparent`：
+      // 即使将来 token 改名，也只会继承所在表面，不会再出现这种致命组合。
+      field: 'var(--dsw-alias-bg-layer-1, transparent)',
+      fieldText: 'var(--dsw-alias-label-primary, #0f172a)',
+      placeholder: 'var(--dsw-alias-label-tertiary, #94a3b8)',
+      optionBg: 'var(--dsw-alias-bg-layer-3, #ffffff)',
+      btnText: 'var(--dsw-alias-label-primary-inverted, #ffffff)',
       btn: 'var(--dsw-alias-button-primary-fill, #2563eb)',
       ok: 'var(--dsw-alias-state-success-primary, #16a34a)',
       warn: 'var(--dsw-alias-state-warn-primary, #f59e0b)',
@@ -49,12 +64,12 @@ window.__ModuleLoader__.load({
       name: { fontWeight: 600, fontSize: 13, color: C.primary },
       row: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10 },
       label: { fontSize: 12.5, color: C.secondary },
-      input: { height: 34, padding: '0 10px', fontSize: 13, borderRadius: 8, border: '1px solid ' + C.border, background: C.field, color: C.primary, font: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' },
-      select: { height: 34, padding: '0 10px', fontSize: 13, borderRadius: 8, border: '1px solid ' + C.border, background: C.field, color: C.primary, font: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' },
+      input: { height: 34, padding: '0 10px', fontSize: 13, borderRadius: 8, border: '1px solid ' + C.border, background: C.field, color: C.fieldText, caretColor: C.fieldText, font: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' },
+      select: { height: 34, padding: '0 10px', fontSize: 13, borderRadius: 8, border: '1px solid ' + C.border, background: C.field, color: C.fieldText, font: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' },
       hint: { fontSize: 11.5, color: C.tertiary, lineHeight: 1.6 },
       footRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 8 },
       btnRow: { display: 'flex', gap: 10, alignItems: 'center', marginTop: 18 },
-      btn: { height: 34, padding: '0 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: C.btn, color: '#fff', font: 'inherit' },
+      btn: { height: 34, padding: '0 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: C.btn, color: C.btnText, font: 'inherit' },
       btnGhost: { height: 34, padding: '0 14px', borderRadius: 8, border: '1px solid ' + C.border, background: 'transparent', color: C.secondary, cursor: 'pointer', fontSize: 13, font: 'inherit' },
       getKey: { display: 'inline-flex', alignItems: 'center', height: 28, padding: '0 12px', borderRadius: 6, border: '1px solid ' + C.btn, background: 'transparent', color: C.btn, fontSize: 12, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', cursor: 'pointer' },
       tagOk: { display: 'inline-block', fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(22,163,74,0.12)', color: C.ok, fontWeight: 600 },
@@ -126,7 +141,7 @@ window.__ModuleLoader__.load({
           : String(snapshot.note).startsWith('❌') ? C.err : C.warn,
       };
 
-      return h('div', { style: S.wrap },
+      return h('div', { style: S.wrap, className: SCOPE },
         h('div', { style: S.card },
           h('div', { style: S.title }, '🌐 AI 超级搜索与免费通道'),
           h('div', { style: S.desc },
@@ -329,6 +344,33 @@ window.__ModuleLoader__.load({
         ],
         'ai-super-search: credential invalidations',
       );
+
+      // 深色模式适配：原生 placeholder、select 下拉项、以及浏览器自动填充的
+      // 底色/字色都由 UA 决定，内联样式管不到，只能用样式表覆盖。
+      // 全部走主题变量，不写死颜色。
+      ctx.effect(() => {
+        if (typeof document === 'undefined') return
+        const style = document.createElement('style')
+        style.dataset.plugin = 'dsh-plugin-ai-super-search'
+        style.textContent = [
+          '.' + SCOPE + ' input::placeholder,',
+          '.' + SCOPE + ' textarea::placeholder {',
+          '  color: ' + C.placeholder + ';',
+          '  opacity: 1;',
+          '}',
+          '.' + SCOPE + ' select option {',
+          '  background: ' + C.optionBg + ';',
+          '  color: ' + C.fieldText + ';',
+          '}',
+          '.' + SCOPE + ' input:-webkit-autofill {',
+          '  -webkit-text-fill-color: ' + C.fieldText + ';',
+          '  -webkit-box-shadow: 0 0 0 1000px ' + C.field + ' inset;',
+          '  caret-color: ' + C.fieldText + ';',
+          '}',
+        ].join('\n')
+        document.head.appendChild(style)
+        return () => style.remove()
+      }, 'ai-super-search: field styles (dark mode)')
 
       void refresh();
     }
