@@ -8,7 +8,7 @@ import {
   searchMetaFromValue,
 } from './present.js'
 
-export const name = '@dsh-external/ai-super-search'
+export const name = 'dsh-plugin-ai-super-search'
 export const inject = ['tools']
 
 function output(value) {

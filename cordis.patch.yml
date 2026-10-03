@@ -35,4 +35,4 @@
 
 - insert:
     - id: ai-super-search
-      name: '@dsh-external/ai-super-search'
+      name: 'dsh-plugin-ai-super-search'

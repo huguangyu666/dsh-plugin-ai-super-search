@@ -16,7 +16,7 @@
  */
 
 window.__ModuleLoader__.load({
-  id: '@dsh-external/ai-super-search',
+  id: 'dsh-plugin-ai-super-search',
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;
@@ -218,7 +218,7 @@ window.__ModuleLoader__.load({
     }
 
     // ───────────────────────────── 插件主体 ─────────────────────────────
-    const name = '@dsh-external/ai-super-search';
+    const name = 'dsh-plugin-ai-super-search';
 
     // cordis 的 ctx 是代理：读取未在 inject 中声明的服务会直接抛
     // `cannot get property "remote" without inject`，fiber 因此进入 failed 状态，

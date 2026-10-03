@@ -32,7 +32,7 @@ function makeCtx() {
 test('registers four namespaced read-only tools', () => {
   const h = makeCtx()
   apply(h.ctx)
-  assert.equal(name, '@dsh-external/ai-super-search')
+  assert.equal(name, 'dsh-plugin-ai-super-search')
   assert.deepEqual(h.registered.map((tool) => tool.name), [
     'ai_super_search_web_search',
     'ai_super_search_fetch_url',

@@ -1,4 +1,4 @@
-# @dsh-external/ai-super-search
+# dsh-plugin-ai-super-search
 
 把 `ai_super_search` 的四个核心入口与免费搜索链路做成 DSH 全功能插件：**用纯免费通道（TinyFish / Bing 爬取 / Jina / DuckDuckGo）彻底顶替官方 DeepSeek 的付费搜索**，零 LLM 额外调用、零 Token 消耗。插件使用 Node 22 原生 `fetch` 与 `fs/promises`，不需要 Python 或额外运行时。
 
