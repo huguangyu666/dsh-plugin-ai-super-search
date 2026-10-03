@@ -383,6 +383,25 @@ export function createSearchService(options = {}) {
     maxResults: numberOption(options.maxResults, numberOption(process.env.DSH_SEARCH_MAX_RESULTS, DEFAULTS.maxResults, 1, 200), 1, 200),
     timeoutMs: numberOption(options.timeoutMs, DEFAULTS.timeoutMs, 1000, 120_000),
   }
+
+  // ⚠ GUI 面板把 Key 存进 DSH 的 credentials 服务，而这个服务此前只读
+  // `process.env` —— 两条路是断的：面板显示「已配置」，搜索链路却永远看不到，
+  // 只能退化到免 Key 后端。官方契约（见 dsh-web-search-deepseek）是
+  // 「凭据服务优先、环境变量兜底」，所以在取 Key 前先拉一份凭据快照叠在
+  // process.env 之上。没有注入 resolveEnv 时行为与以前完全一致。
+  const resolveEnv = typeof options.resolveEnv === 'function' ? options.resolveEnv : null
+
+  /** 合并后的有效环境：凭据服务里的同名引用优先，process.env 兜底。 */
+  async function effectiveEnv() {
+    if (resolveEnv === null) return process.env
+    try {
+      const stored = await resolveEnv()
+      return stored !== null && typeof stored === 'object' ? { ...process.env, ...stored } : process.env
+    } catch {
+      return process.env
+    }
+  }
+
   let closed = false
 
   function assertOpen() {
@@ -433,16 +452,16 @@ export function createSearchService(options = {}) {
    * Header: X-API-Key
    * 返回: { query, results: [{ position, site_name, title, snippet, url }], total_results, page }
    */
-  async function tinyfishSearch(query, maxResults) {
-    const apiKey = tinyfishKey()
+  async function tinyfishSearch(query, maxResults, env = process.env) {
+    const apiKey = tinyfishKey(env)
     if (!apiKey) throw new SearchError('未配置 TINYFISH_API_KEY', 'no_key')
-    const url = new URL(tinyfishBaseUrl())
+    const url = new URL(tinyfishBaseUrl(env))
     url.searchParams.set('query', query)
-    const location = String(process.env.TINYFISH_SEARCH_LOCATION || '').trim()
+    const location = String(env.TINYFISH_SEARCH_LOCATION || '').trim()
     if (location) url.searchParams.set('location', location)
-    const language = String(process.env.TINYFISH_SEARCH_LANGUAGE || '').trim()
+    const language = String(env.TINYFISH_SEARCH_LANGUAGE || '').trim()
     if (language) url.searchParams.set('language', language)
-    const domainType = String(process.env.TINYFISH_SEARCH_DOMAIN_TYPE || '').trim()
+    const domainType = String(env.TINYFISH_SEARCH_DOMAIN_TYPE || '').trim()
     if (domainType) url.searchParams.set('domain_type', domainType)
 
     const response = await fetchText(url.href, {
@@ -481,13 +500,13 @@ export function createSearchService(options = {}) {
    * Headers: Authorization: Bearer <key>
    * Body: { query, max_results, format: 'json', zone }
    */
-  async function anysearchSearch(query, maxResults, allowAnonymous = false) {
-    const apiKey = anysearchKey()
+  async function anysearchSearch(query, maxResults, allowAnonymous = false, env = process.env) {
+    const apiKey = anysearchKey(env)
     if (!apiKey && !allowAnonymous) throw new SearchError('未配置 ANYSEARCH_API_KEY', 'no_key')
-    const base = anysearchBaseUrl().replace(/\/+$/, '')
+    const base = anysearchBaseUrl(env).replace(/\/+$/, '')
     const url = `${base}/v1/search`
-    const zone = String(process.env.ANYSEARCH_ZONE || 'cn').trim()
-    const language = String(process.env.ANYSEARCH_LANGUAGE || '').trim()
+    const zone = String(env.ANYSEARCH_ZONE || 'cn').trim()
+    const language = String(env.ANYSEARCH_LANGUAGE || '').trim()
 
     const response = await fetchText(url, {
       method: 'POST',
@@ -573,8 +592,9 @@ export function createSearchService(options = {}) {
     assertOpen()
     const query = normalizeQuery(rawQuery)
     const maxResults = numberOption(limit, 10, 1, 50)
-    const hasTinyfishKey = tinyfishKey() !== ''
-    const preferred = String(process.env.DSH_SEARCH_ENGINE || '').trim().toLowerCase()
+    const env = await effectiveEnv()
+    const hasTinyfishKey = tinyfishKey(env) !== ''
+    const preferred = String(env.DSH_SEARCH_ENGINE || '').trim().toLowerCase()
 
     // 智能降级链，按「结果质量 + 免费程度」排序：
     //   1. 显式指定的引擎永远第一
@@ -596,14 +616,14 @@ export function createSearchService(options = {}) {
       try {
         let results
         if (name === 'tinyfish') {
-          results = await tinyfishSearch(query, maxResults)
+          results = await tinyfishSearch(query, maxResults, env)
         } else if (name === 'anysearch') {
           // 无 Key 时以匿名身份请求（按 IP 每日免费额度），有 Key 则走鉴权额度
-          results = await anysearchSearch(query, maxResults, true)
+          results = await anysearchSearch(query, maxResults, true, env)
         } else if (name === 'bing') {
           results = await bingSearch(query, maxResults)
         } else if (name === 'jina') {
-          const jinaKey = String(process.env.DSH_JINA_API_KEY || '').trim()
+          const jinaKey = String(env.DSH_JINA_API_KEY || '').trim()
           const jina = await fetchText(`https://s.jina.ai/${encodeURIComponent(query)}`, {
             timeoutMs: limits.timeoutMs,
             blockBenchmark,

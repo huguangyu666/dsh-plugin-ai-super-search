@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-ai-super-search",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "DSH 超级搜索 toolkit：集成 TinyFish 免费结构化检索、AnySearch (咸鱼君/mcxianyujun) REST 检索、Bing 免 Key 爬取、Jina 与 DuckDuckGo，彻底接管 DSH 原生 web_search，零 Token 消耗。",
   "type": "module",
   "main": "lib/index.js",

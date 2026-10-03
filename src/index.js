@@ -11,6 +11,22 @@ import {
 export const name = 'dsh-plugin-ai-super-search'
 export const inject = ['tools']
 
+/**
+ * 面板把这些引用存进 DSH 的 credentials 服务（密钥永不落配置文件），
+ * 而搜索链路读的是环境变量 —— 官方契约是「凭据服务优先、环境变量兜底」。
+ * 这里把两者接起来。⚠ 必须与 src/client.js 里的 REFS 保持一致。
+ */
+const CREDENTIAL_REFS = [
+  'TINYFISH_API_KEY',
+  'TINYFISH_SEARCH_BASE_URL',
+  'ANYSEARCH_API_KEY',
+  'ANYSEARCH_BASE_URL',
+  'ANYSEARCH_ZONE',
+  'ANYSEARCH_LANGUAGE',
+  'DSH_JINA_API_KEY',
+  'DSH_SEARCH_ENGINE',
+]
+
 function output(value) {
   const text = value?.ok === false ? formatError(value) : JSON.stringify(value?.data ?? value, null, 2)
   return [{ type: 'text', text }]
@@ -66,7 +82,31 @@ const webSearchOutput = {
 }
 
 export function apply(ctx) {
-  const service = createSearchService()
+  // 可选注入：部署里没有 credentials 服务时仍然只提供工具（退回纯环境变量）。
+  // 用 inject 而非硬依赖，与下面注入 web 的写法保持一致。
+  let credentials
+  ctx.inject?.(['credentials'], (credentialsCtx) => {
+    credentials = credentialsCtx.credentials
+  })
+
+  /**
+   * 拉取凭据服务里的同名值。单个引用读取失败不影响其它引用；
+   * 读不到（或服务未挂载）时返回 undefined，由 process.env 兜底。
+   */
+  const resolveEnv = async () => {
+    if (credentials === undefined) return undefined
+    const stored = {}
+    for (const ref of CREDENTIAL_REFS) {
+      try {
+        const resolved = await credentials.resolve(ref)
+        const value = resolved?.value
+        if (typeof value === 'string' && value.trim() !== '') stored[ref] = value
+      } catch { /* 忽略单个引用的读取失败 */ }
+    }
+    return stored
+  }
+
+  const service = createSearchService({ resolveEnv })
   const tools = [
     {
       name: 'ai_super_search_web_search',
