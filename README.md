@@ -2,6 +2,87 @@
 
 把 `ai_super_search` 的四个核心入口与免费搜索链路做成 DSH 全功能插件：**用纯免费通道（TinyFish / AnySearch / Bing 爬取 / Jina / DuckDuckGo）彻底顶替官方 DeepSeek 的付费搜索**，零 LLM 额外调用、零 Token 消耗。插件使用 Node 22 原生 `fetch` 与 `fs/promises`，不需要 Python 或额外运行时。
 
+- 包名：`dsh-plugin-ai-super-search`
+- 类型：**bundle**（自带 `dsh.bundle.patch`）＋ 一个 GUI 设置面板（client 半）
+- 要求：DSH `>= 0.1.0-rc.6`、Node `>= 22.5`
+
+---
+
+## 安装
+
+本插件是 **bundle**：安装后它会把 `cordis.patch.yml` 作为一层配置补丁叠进 profile，并插入自己的插件行。用官方 CLI 装：
+
+```sh
+# ① 从 npm 安装（推荐，包里已含预构建的 lib/）
+dsh plugin --profile <profile> add dsh-plugin-ai-super-search
+
+# ② 从本地 checkout 安装（开发用）
+dsh plugin --profile <profile> add /path/to/dsh-plugin-ai-super-search
+
+# ③ 从 tarball 安装
+dsh plugin --profile <profile> add ./dsh-plugin-ai-super-search-0.2.1.tgz
+```
+
+`dsh plugin` 就是转发给 profile 目录里的 pnpm，所以 pnpm 的动词都能用。因为包声明了 `dsh.bundle`，装完它会自动被追加进 profile 的 `dsh.profile.bundles`：
+
+```json
+{
+  "dsh": {
+    "profile": {
+      "bundles": ["@deepseek-ai/dsh-base", "dsh-plugin-ai-super-search"]
+    }
+  }
+}
+```
+
+### 装完先验证，再启动
+
+```sh
+# 干跑：应能看到 dsh-plugin-ai-super-search 贡献的那一层
+dsh --profile <profile> --dump-config
+
+# 正常启动
+dsh --profile <profile>
+```
+
+启动后在**插件列表**里应能看到 `ai-super-search`（模块名 `dsh-plugin-ai-super-search`）处于 **active** 状态；工具列表里应出现 4 个 `ai_super_search_*` 工具。GUI 侧会在 **设置 →「🌐 AI 超级搜索与免费通道」** 多出一个面板。
+
+> 关键一步不能省：确认 profile 的 `node_modules/dsh-plugin-ai-super-search` **真的建出来了**。缺了它，loader 会**静默跳过整层 patch**、搜索悄悄回落官方付费通道且零报错 —— 详见 [排障](#排障为什么看着开着实际还是走官方付费搜索)。
+
+### 卸载
+
+```sh
+dsh plugin --profile <profile> remove dsh-plugin-ai-super-search
+```
+
+依赖和配置层会一起移除。
+
+### 桌面端（Electron 应用）例外
+
+桌面端应用的 `desktop` profile 由**应用自己独占管理**，CLI 会直接拒绝操作它：
+
+```
+error: profile "desktop" is managed exclusively by the Electron application
+```
+
+所以在桌面端请用 **设置 → 插件管理器** 安装/启停；`dsh plugin` 用于其它 profile（`web` / `acp` / `headless` / 自建 profile）。
+
+### 从 GitHub 安装（可选）
+
+```sh
+dsh plugin --profile <profile> add github:huguangyu666/dsh-plugin-ai-super-search
+```
+
+仓库里只有源码（`lib/` 被 gitignore），所以本包带 `prepare` 脚本，装的时候会把 `src/` 构建成 `lib/`。注意 pnpm ≥ 10 默认拒绝执行 git 依赖的构建脚本，首次 `add` 会失败并提示；把它打印的键加进 profile 的 `pnpm-workspace.yaml` 再重试：
+
+```yaml
+allowBuilds:
+  dsh-plugin-ai-super-search: true
+```
+
+> ⚠️ 这个许可意味着**安装时会在你机器上执行包里的代码**（在任何沙箱之外）。只对你信得过的源开；要固定版本就带上 commit：`github:huguangyu666/dsh-plugin-ai-super-search#<sha>`。
+> 不想给这个许可，就用上面的 npm 或 tarball —— 两者装的都是预构建产物，不需要任何构建权限。
+
 ---
 
 ## 核心价值：告别官方 DeepSeek 搜索隐形扣费
@@ -56,24 +137,6 @@ DSH 内置的 `web-search-deepseek` 会把每一次 `web_search` 变成一次完
 
 ---
 
-## 安装到 profile
-
-插件是 **bundle**（自带 `dsh.bundle.patch` → `cordis.patch.yml`），装进 profile 的流程：
-
-```bash
-# 1. 作为 link 依赖装进目标 profile（或 dsh plugin --profile <name> add <路径>）
-#    会写 profile 的 package.json：
-#      dependencies: { "dsh-plugin-ai-super-search": "link:C:/…/dsh-plugin-ai-super-search" }
-#      dsh.profile.bundles: [ … , "dsh-plugin-ai-super-search" ]
-
-# 2. 必须让 pnpm 真正建出 node_modules/<包名> 链接
-cd ~/.dsh/profiles/<name> && pnpm install
-```
-
-⚠️ **第 2 步不能省，否则插件会「静默失效」——见下方排障。**
-
----
-
 ## 排障：为什么「看着开着，实际还是走官方付费搜索」
 
 这是本插件最容易踩、且**零报错**的坑，两个独立原因：
@@ -98,7 +161,7 @@ profile 目录下的 `cordis.yml` **只是「空根补丁文件」**，loader �
 > `# each bundle in package.json's dsh.profile.bundles, then cordis.patch.yml, then any --patch overlays.`
 > `# Edit cordis.patch.yml, not this file.`
 
-有效的配置来源只有三层，按序叠加：**各 bundle 自带的 patch → profile 的 `cordis.patch.yml` → `$DSH_HOME/cordis.patch.yml`**。往 `cordis.yml` 里写 `searchProvider: tinyfish` 或者手写一条 `ai-super-search` 条目，等于写在会被撕掉的草稿纸上。
+有效的配置来源只有四层，按序叠加：**各 bundle 自带的 patch → profile 的 `cordis.patch.yml` → `$DSH_HOME/cordis.patch.yml` → `--patch` overlay**。往 `cordis.yml` 里写 `searchProvider: tinyfish` 或者手写一条 `ai-super-search` 条目，等于写在会被撕掉的草稿纸上。
 
 ### 三步自检（确认真的改道了）
 
@@ -167,3 +230,17 @@ node --test test/*.test.mjs
 ```
 
 > ⚠️ 宿主加载的是 `lib/`（`package.json` 的 `main`），不是 `src/`。改完 `src/` 务必 `node build.mjs`，否则运行的是旧代码 —— 可用 `Get-FileHash`/`sha256sum` 对比 `src/*.js` 与 `lib/*.js` 是否一致。
+
+### 依赖声明约定
+
+`src/provider.js` 里 `import { WebError } from '@deepseek-ai/dsh-web'`。凡是**必须与宿主共享同一实例**的 dsh 包，都按官方约定**同时**写进 `peerDependencies` 和 `devDependencies`：
+
+- `peerDependencies` 让运行时的解析用**宿主安装的那一份**；范围必须写得足够宽（本插件用 `>=0.1.0-rc.6`）—— 因为 DSH 的兼容性检查是拿 peer 范围去比**运行时版本**，写死某个具体版本会被判为不兼容、整个 bundle 被跳过。
+- `devDependencies` 只服务于本仓库的类型检查与独立测试，不会被装进用户的 profile（依赖的 devDependencies 永远不会被安装）。
+
+---
+
+## 参考
+
+- 官方插件开发与安装文档：[Package and install a plugin](https://deepseek-harness.github.io/deepseek-harness/en/develop/basic/publish)
+- 加载顺序与 profile 机制：[CLI behavior reference](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/reference/README.md)
