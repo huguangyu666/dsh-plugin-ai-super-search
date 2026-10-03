@@ -1,0 +1,38 @@
+# AI Super Search：把「联网搜索」整条链路换成免费通道。
+#
+# 这个 patch 做两件事：
+#
+#   1. 覆盖 `web` 行的 searchProvider，把搜索选择从官方的 `deepseek-official`
+#      切到本插件注册的 `tinyfish`。
+#
+#      —— 为什么必须切：官方那条路是**独立的付费通道**。每次 web_search
+#      = 一次完整的 Anthropic Messages 调用（deepseek-v4-flash，
+#      max_tokens 4096）+ 服务端 web_search_20250305 工具（max_uses 5），
+#      从官方 DeepSeek 余额扣钱；而面板只显示对话模型的用量，
+#      这笔账用户完全看不见。实测一个会话可累计 428 次搜索请求。
+#
+#      切到 tinyfish 后，**内置的 `web_search` 工具本身**改走免费 HTTP 抓取
+#      （TinyFish → Bing → Jina → DuckDuckGo 降级链），模型行为零改变、
+#      成本归零。provider 的 available() 恒为 true，因此即使没配
+#      TINYFISH_API_KEY 也不会把搜索能力切死，只会降级到抓取后端。
+#
+#      fetchProvider 一并写回：patch 是按行覆盖，漏写会丢掉原值。
+#
+#   2. 插入本插件的工具行：ai_super_search_web_search / _fetch_url /
+#      _local_files / _code。
+#
+# 官方 dsh-base 里的原始声明（被本层覆盖）：
+#   - id: web
+#     name: '@deepseek-ai/dsh-web'
+#     config:
+#       searchProvider: deepseek-official
+#       fetchProvider: http
+
+- id: web
+  config:
+    searchProvider: tinyfish
+    fetchProvider: http
+
+- insert:
+    - id: ai-super-search
+      name: '@dsh-external/ai-super-search'

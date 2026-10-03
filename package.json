@@ -1,0 +1,43 @@
+{
+  "name": "@dsh-external/ai-super-search",
+  "version": "0.2.0",
+  "description": "DSH 超级搜索 toolkit：集成 TinyFish 免费结构化检索、AnySearch (咸鱼君/mcxianyujun) REST 检索、Bing 免 Key 爬取、Jina 与 DuckDuckGo，彻底接管 DSH 原生 web_search，零 Token 消耗。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build": "node build.mjs",
+    "prepack": "node build.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.1.0-rc.6"
+  }
+}
