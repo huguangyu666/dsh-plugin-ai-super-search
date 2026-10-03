@@ -210,6 +210,18 @@ function decodeHtml(text) {
     .replace(/&#(\d+);/g, (_, value) => String.fromCodePoint(Number(value)))
 }
 
+/**
+ * 取第一个非空字符串。各搜索后端对「摘要」的字段命名不统一
+ * （snippet / description / content / summary / text…），逐个尝试。
+ * 全部拿不到时返回空串 —— 交给上层决定省略该字段。
+ */
+function firstText(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) return value.trim()
+  }
+  return ''
+}
+
 function cleanText(text) {
   return decodeHtml(String(text).replace(/<[^>]*>/g, ' '))
     .replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/\n[ \t]+/g, '\n')
@@ -268,7 +280,7 @@ function parseJinaLinks(markdown, limit) {
   while ((match = pattern.exec(markdown)) && results.length < limit) {
     const title = cleanText(match[1])
     if (!title || title.startsWith('!')) continue
-    results.push({ title, url: match[2], snippet: `来自 ${match[2]}`, score: Math.max(0.1, 1 - results.length * 0.1), source: 'jina' })
+    results.push({ title, url: match[2], snippet: '', score: Math.max(0.1, 1 - results.length * 0.1), source: 'jina' })
   }
   return results
 }
@@ -285,7 +297,7 @@ export function parseBing(html, limit) {
     const title = cleanText(link[2])
     if (!title) continue
     const snippetMatch = block[1].match(/<(?:p|span)[^>]*class=["'][^"']*b_(?:caption|snippet|lineclamp)[^"']*["'][^>]*>([\s\S]*?)<\/(?:p|span)>/i)
-    results.push({ title, url, snippet: snippetMatch ? cleanText(snippetMatch[1]) : url, score: Math.max(0.1, 1 - results.length * 0.1), source: 'bing' })
+    results.push({ title, url, snippet: snippetMatch ? cleanText(snippetMatch[1]) : '', score: Math.max(0.1, 1 - results.length * 0.1), source: 'bing' })
   }
   return results
 }
@@ -329,7 +341,7 @@ export function parseDdg(html, limit) {
     const { href, title } = tags[index]
     const url = decodeDdgUrl(href)
     if (!/^https?:\/\//i.test(url)) continue
-    results.push({ title: title || url, url, snippet: snippets[index] || url, score: Math.max(0.1, 1 - results.length * 0.1), source: 'ddg' })
+    results.push({ title: title || url, url, snippet: snippets[index] || '', score: Math.max(0.1, 1 - results.length * 0.1), source: 'ddg' })
     if (results.length >= limit) break
   }
   return results
@@ -481,10 +493,13 @@ export function createSearchService(options = {}) {
       const resultUrl = typeof item?.url === 'string' ? item.url.trim() : ''
       if (!resultUrl || seen.has(resultUrl)) continue
       seen.add(resultUrl)
+      // ⚠ 拿不到摘要就留空，**绝不拿 URL 冒充摘要**：否则卡片会显示
+      // 「标题 + 一行网址」，看起来就像「搜索结果只有标题」。
+      const summary = firstText(item?.snippet, item?.description, item?.content, item?.summary, item?.text)
       results.push({
         title: typeof item?.title === 'string' && item.title.length > 0 ? item.title : resultUrl,
         url: resultUrl,
-        snippet: typeof item?.snippet === 'string' && item.snippet.length > 0 ? item.snippet : resultUrl,
+        snippet: summary,
         score: Math.max(0.1, 1 - results.length * 0.1),
         source: 'tinyfish',
       })
@@ -556,7 +571,7 @@ export function createSearchService(options = {}) {
       results.push({
         title: typeof item?.title === 'string' && item.title.length > 0 ? item.title : resultUrl,
         url: resultUrl,
-        snippet: rich.length > 0 ? rich.slice(0, 600) : resultUrl,
+        snippet: rich.length > 0 ? rich.slice(0, 1200) : '',
         score: Math.max(0.1, 1 - results.length * 0.1),
         source: 'anysearch',
       })
