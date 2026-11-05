@@ -1,26 +1,28 @@
 {
   "name": "dsh-plugin-ai-super-search",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "DSH 超级搜索 toolkit：集成 TinyFish 免费结构化检索、AnySearch (咸鱼君/mcxianyujun) REST 检索、Bing 免 Key 爬取、Jina 与 DuckDuckGo，彻底接管 DSH 原生 web_search，零 Token 消耗。",
   "type": "module",
-  "main": "lib/index.js",
+  "main": "src/index.js",
   "exports": {
     ".": {
-      "default": "./lib/index.js"
+      "default": "./src/index.js"
     },
     "./client": {
-      "default": "./lib/client.js"
+      "default": "./src/client.js"
     },
     "./package.json": "./package.json"
   },
   "files": [
-    "lib",
+    "src",
     "cordis.patch.yml",
     "README.md",
     "LICENSE"
   ],
   "license": "MIT",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22.5"
   },
@@ -35,9 +37,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "build": "node build.mjs",
-    "prepare": "node build.mjs",
-    "prepack": "node build.mjs"
+    "build": "node build.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.1.0-rc.6",
@@ -45,5 +45,9 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-web": "0.1.7-rc.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/huguangyu666/dsh-plugin-ai-super-search.git"
   }
 }

@@ -13,14 +13,14 @@
 本插件是 **bundle**：安装后它会把 `cordis.patch.yml` 作为一层配置补丁叠进 profile，并插入自己的插件行。用官方 CLI 装：
 
 ```sh
-# ① 从 npm 安装（推荐，包里已含预构建的 lib/）
+# ① 从 npm 安装（推荐，包里已含可直接运行的 JavaScript）
 dsh plugin --profile <profile> add dsh-plugin-ai-super-search
 
 # ② 从本地 checkout 安装（开发用）
 dsh plugin --profile <profile> add /path/to/dsh-plugin-ai-super-search
 
 # ③ 从 tarball 安装
-dsh plugin --profile <profile> add ./dsh-plugin-ai-super-search-0.2.1.tgz
+dsh plugin --profile <profile> add ./dsh-plugin-ai-super-search-0.2.5.tgz
 ```
 
 `dsh plugin` 就是转发给 profile 目录里的 pnpm，所以 pnpm 的动词都能用。因为包声明了 `dsh.bundle`，装完它会自动被追加进 profile 的 `dsh.profile.bundles`：
@@ -73,15 +73,7 @@ error: profile "desktop" is managed exclusively by the Electron application
 dsh plugin --profile <profile> add github:huguangyu666/dsh-plugin-ai-super-search
 ```
 
-仓库里只有源码（`lib/` 被 gitignore），所以本包带 `prepare` 脚本，装的时候会把 `src/` 构建成 `lib/`。注意 pnpm ≥ 10 默认拒绝执行 git 依赖的构建脚本，首次 `add` 会失败并提示；把它打印的键加进 profile 的 `pnpm-workspace.yaml` 再重试：
-
-```yaml
-allowBuilds:
-  dsh-plugin-ai-super-search: true
-```
-
-> ⚠️ 这个许可意味着**安装时会在你机器上执行包里的代码**（在任何沙箱之外）。只对你信得过的源开；要固定版本就带上 commit：`github:huguangyu666/dsh-plugin-ai-super-search#<sha>`。
-> 不想给这个许可，就用上面的 npm 或 tarball —— 两者装的都是预构建产物，不需要任何构建权限。
+本插件直接加载 `src/` 中的 JavaScript，Git 安装无需执行 `prepare` 或为构建脚本配置 `allowBuilds`。
 
 ---
 
@@ -171,7 +163,7 @@ profile 目录下的 `cordis.yml` **只是「空根补丁文件」**，loader �
 
    ```bash
    node --input-type=module -e "
-   const { createSearchService } = await import('file:///…/dsh-plugin-ai-super-search/lib/search.js');
+   const { createSearchService } = await import('file:///…/dsh-plugin-ai-super-search/src/search.js');
    const s = createSearchService();
    try { console.log(JSON.stringify(await s.webSearch({ query: '同一个测试词', limit: 5 })).slice(0,600)) }
    finally { await s.close() }"
@@ -229,7 +221,7 @@ node build.mjs
 node --test test/*.test.mjs
 ```
 
-> ⚠️ 宿主加载的是 `lib/`（`package.json` 的 `main`），不是 `src/`。改完 `src/` 务必 `node build.mjs`，否则运行的是旧代码 —— 可用 `Get-FileHash`/`sha256sum` 对比 `src/*.js` 与 `lib/*.js` 是否一致。
+> ⚠️ 宿主直接加载 `src/`；`node build.mjs` 可选，用于生成 `lib/` 副本。
 
 ### 依赖声明约定
 
